@@ -2,20 +2,58 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Users, BarChart3, HelpCircle, LogOut, CheckCircle, Clock, RefreshCw, Trash2, Plus, Eye, EyeOff, Ban } from 'lucide-react';
+import { Lock, Users, BarChart3, HelpCircle, LogOut, CheckCircle, Clock, RefreshCw, Trash2, Plus, Eye, EyeOff, Ban, ChevronRight, X, Globe, Phone, Mail, MapPin, FileText, Megaphone } from 'lucide-react';
 import { GradientButton, GlassCard, LoadingSpinner, useToast } from '@/components/ui';
 
 type Tab = 'submissions' | 'analytics' | 'faqs';
 
+interface BusinessProfile {
+  id: string;
+  business_name?: string;
+  contact_name?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  location?: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface AdVersion {
+  id: string;
+  model: string;
+  temperature?: number;
+  ad_json: {
+    headline?: string;
+    short_description?: string;
+    full_description?: string;
+    call_to_action?: string;
+    keywords?: string[];
+    categories?: string[];
+    business_description?: string;
+    turnkey_offer?: string;
+  };
+  is_selected: boolean;
+  created_at: string;
+}
+
 interface Submission {
   id: string;
+  token: string;
   email: string;
+  contact_name?: string;
   source: string;
   onboarding_completed: boolean;
+  selling_completed: boolean;
+  current_step?: string;
   started_at: string;
   completed_at?: string;
+  last_accessed_at?: string;
+  expires_at?: string;
   status: string;
-  business_profiles?: Array<{ business_name?: string }>;
+  business_profiles?: BusinessProfile[];
+  ad_versions?: AdVersion[];
 }
 
 interface Analytics {
@@ -49,6 +87,9 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
+
+  // Submission detail state
+  const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
 
   // FAQ edit state
   const [editingFaq, setEditingFaq] = useState<FAQ | null>(null);
@@ -250,40 +291,274 @@ export default function AdminPage() {
               <div className="space-y-3">
                 {submissions.length === 0 && <p className="text-itex-gray text-center py-8">No submissions yet.</p>}
                 {submissions.map(sub => (
-                  <GlassCard key={sub.id} padding="sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${sub.onboarding_completed ? 'bg-itex-lime/20' : 'bg-amber-100'}`}>
-                          {sub.onboarding_completed
-                            ? <CheckCircle className="w-4 h-4 text-itex-lime" />
-                            : <Clock className="w-4 h-4 text-amber-500" />}
+                  <button key={sub.id} onClick={() => setSelectedSub(sub)} className="w-full text-left">
+                    <GlassCard padding="sm" className="hover:ring-2 hover:ring-itex-lime/30 transition-all cursor-pointer">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${sub.onboarding_completed ? 'bg-itex-lime/20' : 'bg-amber-100'}`}>
+                            {sub.onboarding_completed
+                              ? <CheckCircle className="w-4 h-4 text-itex-lime" />
+                              : <Clock className="w-4 h-4 text-amber-500" />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-itex-dark truncate">
+                              {sub.business_profiles?.[0]?.business_name || sub.email}
+                            </p>
+                            <p className="text-xs text-itex-gray">{sub.email} · {sub.source} · {new Date(sub.started_at).toLocaleDateString()}</p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-itex-dark truncate">
-                            {sub.business_profiles?.[0]?.business_name || sub.email}
-                          </p>
-                          <p className="text-xs text-itex-gray">{sub.email} · {sub.source} · {new Date(sub.started_at).toLocaleDateString()}</p>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sub.onboarding_completed ? 'bg-itex-lime/10 text-itex-lime' : 'bg-amber-50 text-amber-600'}`}>
+                            {sub.onboarding_completed ? 'Complete' : 'Incomplete'}
+                          </span>
+                          {sub.status === 'revoked' && (
+                            <span className="text-xs text-red-400 font-medium">Revoked</span>
+                          )}
+                          <ChevronRight className="w-4 h-4 text-itex-gray" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sub.onboarding_completed ? 'bg-itex-lime/10 text-itex-lime' : 'bg-amber-50 text-amber-600'}`}>
-                          {sub.onboarding_completed ? 'Complete' : 'Incomplete'}
-                        </span>
-                        {sub.status === 'active' && (
-                          <button onClick={() => revokeToken(sub.id)} title="Revoke token"
-                            className="text-itex-gray hover:text-red-500 transition-colors">
-                            <Ban className="w-4 h-4" />
-                          </button>
-                        )}
-                        {sub.status === 'revoked' && (
-                          <span className="text-xs text-red-400 font-medium">Revoked</span>
-                        )}
-                      </div>
-                    </div>
-                  </GlassCard>
+                    </GlassCard>
+                  </button>
                 ))}
               </div>
             )}
+
+            {/* Submission Detail Slide-over */}
+            <AnimatePresence>
+              {selectedSub && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black/30 z-40"
+                    onClick={() => setSelectedSub(null)}
+                  />
+                  <motion.div
+                    initial={{ x: '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-white shadow-2xl z-50 overflow-y-auto"
+                  >
+                    {/* Detail Header */}
+                    <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                      <div>
+                        <h3 className="text-lg font-bold text-itex-dark">
+                          {selectedSub.business_profiles?.[0]?.business_name || 'Unnamed Business'}
+                        </h3>
+                        <p className="text-xs text-itex-gray">{selectedSub.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedSub.status === 'active' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); revokeToken(selectedSub.id); setSelectedSub(null); }}
+                            title="Revoke token"
+                            className="p-2 text-itex-gray hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Ban className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button onClick={() => setSelectedSub(null)} className="p-2 text-itex-gray hover:text-itex-dark hover:bg-gray-100 rounded-lg transition-colors">
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="px-6 py-5 space-y-6">
+                      {/* Status Badges */}
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`text-xs px-3 py-1 rounded-full font-medium ${selectedSub.onboarding_completed ? 'bg-itex-lime/10 text-itex-lime' : 'bg-amber-50 text-amber-600'}`}>
+                          {selectedSub.onboarding_completed ? 'Onboarding Complete' : 'Onboarding Incomplete'}
+                        </span>
+                        <span className={`text-xs px-3 py-1 rounded-full font-medium ${selectedSub.status === 'active' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-500'}`}>
+                          {selectedSub.status === 'active' ? 'Active' : 'Revoked'}
+                        </span>
+                        <span className="text-xs px-3 py-1 rounded-full font-medium bg-gray-100 text-itex-gray">
+                          {selectedSub.source}
+                        </span>
+                        {selectedSub.current_step && (
+                          <span className="text-xs px-3 py-1 rounded-full font-medium bg-purple-50 text-purple-600">
+                            Step: {selectedSub.current_step}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Session Info */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-itex-gray uppercase tracking-wider mb-3">Session Info</h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs text-itex-gray">Started</p>
+                            <p className="font-medium text-itex-dark">{new Date(selectedSub.started_at).toLocaleString()}</p>
+                          </div>
+                          {selectedSub.completed_at && (
+                            <div>
+                              <p className="text-xs text-itex-gray">Completed</p>
+                              <p className="font-medium text-itex-dark">{new Date(selectedSub.completed_at).toLocaleString()}</p>
+                            </div>
+                          )}
+                          {selectedSub.last_accessed_at && (
+                            <div>
+                              <p className="text-xs text-itex-gray">Last Accessed</p>
+                              <p className="font-medium text-itex-dark">{new Date(selectedSub.last_accessed_at).toLocaleString()}</p>
+                            </div>
+                          )}
+                          {selectedSub.expires_at && (
+                            <div>
+                              <p className="text-xs text-itex-gray">Expires</p>
+                              <p className="font-medium text-itex-dark">{new Date(selectedSub.expires_at).toLocaleString()}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Business Profile */}
+                      {selectedSub.business_profiles && selectedSub.business_profiles.length > 0 && (() => {
+                        const bp = selectedSub.business_profiles![0];
+                        return (
+                          <div>
+                            <h4 className="text-xs font-semibold text-itex-gray uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                              <FileText className="w-3.5 h-3.5" /> Business Profile
+                            </h4>
+                            <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                              {bp.business_name && (
+                                <div>
+                                  <p className="text-xs text-itex-gray">Business Name</p>
+                                  <p className="text-sm font-semibold text-itex-dark">{bp.business_name}</p>
+                                </div>
+                              )}
+                              <div className="grid grid-cols-2 gap-3">
+                                {bp.contact_name && (
+                                  <div className="flex items-start gap-2">
+                                    <Users className="w-3.5 h-3.5 text-itex-gray mt-0.5 flex-shrink-0" />
+                                    <div>
+                                      <p className="text-xs text-itex-gray">Contact</p>
+                                      <p className="text-sm text-itex-dark">{bp.contact_name}</p>
+                                    </div>
+                                  </div>
+                                )}
+                                {bp.email && (
+                                  <div className="flex items-start gap-2">
+                                    <Mail className="w-3.5 h-3.5 text-itex-gray mt-0.5 flex-shrink-0" />
+                                    <div>
+                                      <p className="text-xs text-itex-gray">Email</p>
+                                      <p className="text-sm text-itex-dark break-all">{bp.email}</p>
+                                    </div>
+                                  </div>
+                                )}
+                                {bp.phone && (
+                                  <div className="flex items-start gap-2">
+                                    <Phone className="w-3.5 h-3.5 text-itex-gray mt-0.5 flex-shrink-0" />
+                                    <div>
+                                      <p className="text-xs text-itex-gray">Phone</p>
+                                      <p className="text-sm text-itex-dark">{bp.phone}</p>
+                                    </div>
+                                  </div>
+                                )}
+                                {bp.location && (
+                                  <div className="flex items-start gap-2">
+                                    <MapPin className="w-3.5 h-3.5 text-itex-gray mt-0.5 flex-shrink-0" />
+                                    <div>
+                                      <p className="text-xs text-itex-gray">Location</p>
+                                      <p className="text-sm text-itex-dark">{bp.location}</p>
+                                    </div>
+                                  </div>
+                                )}
+                                {bp.website && (
+                                  <div className="flex items-start gap-2 col-span-2">
+                                    <Globe className="w-3.5 h-3.5 text-itex-gray mt-0.5 flex-shrink-0" />
+                                    <div>
+                                      <p className="text-xs text-itex-gray">Website</p>
+                                      <a href={bp.website.startsWith('http') ? bp.website : `https://${bp.website}`} target="_blank" rel="noopener noreferrer"
+                                        className="text-sm text-blue-600 hover:underline break-all">{bp.website}</a>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              {bp.description && (
+                                <div>
+                                  <p className="text-xs text-itex-gray mb-1">Description</p>
+                                  <p className="text-sm text-itex-dark leading-relaxed">{bp.description}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Ad Versions */}
+                      {selectedSub.ad_versions && selectedSub.ad_versions.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-itex-gray uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                            <Megaphone className="w-3.5 h-3.5" /> Generated Ads ({selectedSub.ad_versions.length})
+                          </h4>
+                          <div className="space-y-3">
+                            {selectedSub.ad_versions.map((ad, idx) => (
+                              <div key={ad.id} className={`rounded-xl p-4 border ${ad.is_selected ? 'border-itex-lime bg-itex-lime/5' : 'border-gray-200 bg-gray-50'}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-medium text-itex-gray">
+                                    Ad #{idx + 1} {ad.is_selected && <span className="text-itex-lime ml-1">(Selected)</span>}
+                                  </span>
+                                  <span className="text-xs text-itex-gray">{new Date(ad.created_at).toLocaleString()}</span>
+                                </div>
+                                {ad.ad_json.headline && (
+                                  <p className="text-base font-bold text-itex-dark mb-1">{ad.ad_json.headline}</p>
+                                )}
+                                {ad.ad_json.short_description && (
+                                  <p className="text-sm text-itex-gray mb-2">{ad.ad_json.short_description}</p>
+                                )}
+                                {ad.ad_json.full_description && (
+                                  <p className="text-sm text-itex-dark leading-relaxed mb-2">{ad.ad_json.full_description}</p>
+                                )}
+                                {ad.ad_json.business_description && (
+                                  <div className="mb-2">
+                                    <p className="text-xs font-semibold text-itex-gray mb-1">Business Description</p>
+                                    <p className="text-sm text-itex-dark leading-relaxed">{ad.ad_json.business_description}</p>
+                                  </div>
+                                )}
+                                {ad.ad_json.turnkey_offer && (
+                                  <div className="mb-2">
+                                    <p className="text-xs font-semibold text-itex-gray mb-1">Turnkey Offer</p>
+                                    <p className="text-sm text-itex-dark leading-relaxed">{ad.ad_json.turnkey_offer}</p>
+                                  </div>
+                                )}
+                                {ad.ad_json.call_to_action && (
+                                  <p className="text-sm font-semibold text-itex-lime">{ad.ad_json.call_to_action}</p>
+                                )}
+                                {ad.ad_json.keywords && ad.ad_json.keywords.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {ad.ad_json.keywords.map((kw, i) => (
+                                      <span key={i} className="text-xs bg-white border border-gray-200 text-itex-gray px-2 py-0.5 rounded-full">{kw}</span>
+                                    ))}
+                                  </div>
+                                )}
+                                {ad.ad_json.categories && ad.ad_json.categories.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {ad.ad_json.categories.map((cat, i) => (
+                                      <span key={i} className="text-xs bg-itex-lime/10 text-itex-lime px-2 py-0.5 rounded-full">{cat}</span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* No data message */}
+                      {(!selectedSub.business_profiles || selectedSub.business_profiles.length === 0) &&
+                       (!selectedSub.ad_versions || selectedSub.ad_versions.length === 0) && (
+                        <div className="text-center py-8">
+                          <p className="text-itex-gray text-sm">No business profile or ads generated yet.</p>
+                          <p className="text-xs text-itex-gray mt-1">This member has not completed the onboarding flow.</p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
 
             {/* Analytics Tab */}
             {tab === 'analytics' && analytics && (
