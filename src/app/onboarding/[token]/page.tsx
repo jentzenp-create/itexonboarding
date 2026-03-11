@@ -5,17 +5,29 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProgressStepper, LoadingSpinner, AppDownloadBanner } from '@/components/ui';
 import { SessionValidateResponse } from '@/types';
-import { BusinessInfoStep } from '@/components/onboarding/BusinessInfoStep';
-import { AdGeneratorStep } from '@/components/onboarding/AdGeneratorStep';
+import { BusinessInfoStep, BusinessBasicInfo } from '@/components/onboarding/BusinessInfoStep';
+import { AIDiscoveryChat, DiscoveryResult } from '@/components/onboarding/AIDiscoveryChat';
+import { ReviewApproveStep } from '@/components/onboarding/ReviewApproveStep';
 import { SellingStep } from '@/components/onboarding/SellingStep';
 
 const STEPS = [
-  { id: 'business', label: 'Business Info' },
-  { id: 'ad', label: 'Your Ad' },
-  { id: 'selling', label: 'Selling on ITEX' },
+  { id: 'business', label: 'Basic Info' },
+  { id: 'discover', label: 'AI Discovery' },
+  { id: 'review', label: 'Review & Approve' },
+  { id: 'selling', label: 'Get Started' },
 ];
 
-const stepIndex = { business: 0, ad: 1, selling: 2, done: 2 };
+type OnboardingStep = 'business' | 'discover' | 'review' | 'selling';
+
+const stepIndex: Record<string, number> = {
+  business: 0,
+  discover: 1,
+  review: 2,
+  selling: 3,
+  // Map legacy steps
+  ad: 1,
+  done: 3,
+};
 
 export default function OnboardingPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
@@ -24,7 +36,11 @@ export default function OnboardingPage({ params }: { params: Promise<{ token: st
   const [session, setSession] = useState<SessionValidateResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentStep, setCurrentStep] = useState<'business' | 'ad' | 'selling'>('business');
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>('business');
+
+  // Data passed between steps
+  const [businessInfo, setBusinessInfo] = useState<BusinessBasicInfo | null>(null);
+  const [discoveryResult, setDiscoveryResult] = useState<DiscoveryResult | null>(null);
 
   useEffect(() => {
     validateToken();
@@ -54,7 +70,19 @@ export default function OnboardingPage({ params }: { params: Promise<{ token: st
         return;
       }
 
-      setCurrentStep(data.currentStep as 'business' | 'ad' | 'selling');
+      // Map the server step to our new flow
+      const serverStep = data.currentStep as string;
+      if (serverStep === 'business') {
+        setCurrentStep('business');
+      } else if (serverStep === 'ad' || serverStep === 'discover' || serverStep === 'review') {
+        // If they've already done business info, go to discovery
+        setCurrentStep('discover');
+      } else if (serverStep === 'selling') {
+        setCurrentStep('selling');
+      } else {
+        setCurrentStep('business');
+      }
+
       setLoading(false);
     } catch {
       setError('Failed to validate your link. Please try again.');
@@ -62,16 +90,29 @@ export default function OnboardingPage({ params }: { params: Promise<{ token: st
     }
   };
 
-  const handleStepComplete = (nextStep?: 'business' | 'ad' | 'selling' | 'done') => {
-    if (nextStep === 'done') {
-      router.push(`/dashboard/${token}`);
-      return;
-    }
-    if (nextStep) {
-      setCurrentStep(nextStep);
-      // Update session state
-      setSession(prev => prev ? { ...prev, currentStep: nextStep } : prev);
-    }
+  const handleBusinessComplete = (data: BusinessBasicInfo) => {
+    setBusinessInfo(data);
+    setCurrentStep('discover');
+    setSession(prev => prev ? { ...prev, currentStep: 'ad' } : prev);
+  };
+
+  const handleDiscoveryComplete = (result: DiscoveryResult) => {
+    setDiscoveryResult(result);
+    setCurrentStep('review');
+  };
+
+  const handleReviewComplete = () => {
+    setCurrentStep('selling');
+    setSession(prev => prev ? { ...prev, currentStep: 'selling' } : prev);
+  };
+
+  const handleRegenerate = () => {
+    setDiscoveryResult(null);
+    setCurrentStep('discover');
+  };
+
+  const handleSellingComplete = () => {
+    router.push(`/dashboard/${token}`);
   };
 
   if (loading) {
@@ -113,7 +154,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ token: st
           </div>
           <ProgressStepper
             steps={STEPS}
-            currentStep={stepIndex[currentStep]}
+            currentStep={stepIndex[currentStep] ?? 0}
           />
         </div>
       </div>
@@ -131,24 +172,45 @@ export default function OnboardingPage({ params }: { params: Promise<{ token: st
             >
               <BusinessInfoStep
                 session={session}
-                onComplete={() => handleStepComplete('ad')}
+                onComplete={handleBusinessComplete}
               />
             </motion.div>
           )}
-          {currentStep === 'ad' && (
+
+          {currentStep === 'discover' && (
             <motion.div
-              key="ad"
+              key="discover"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <AdGeneratorStep
+              <AIDiscoveryChat
                 session={session}
-                onComplete={() => handleStepComplete('selling')}
+                businessName={businessInfo?.businessName || 'your business'}
+                location={businessInfo?.location || ''}
+                onComplete={handleDiscoveryComplete}
               />
             </motion.div>
           )}
+
+          {currentStep === 'review' && discoveryResult && (
+            <motion.div
+              key="review"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <ReviewApproveStep
+                session={session}
+                discoveryResult={discoveryResult}
+                onComplete={handleReviewComplete}
+                onRegenerate={handleRegenerate}
+              />
+            </motion.div>
+          )}
+
           {currentStep === 'selling' && (
             <motion.div
               key="selling"
@@ -159,7 +221,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ token: st
             >
               <SellingStep
                 session={session}
-                onComplete={() => handleStepComplete('done')}
+                onComplete={handleSellingComplete}
               />
             </motion.div>
           )}

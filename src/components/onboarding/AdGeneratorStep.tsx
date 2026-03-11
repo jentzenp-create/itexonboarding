@@ -8,6 +8,8 @@ import { SessionValidateResponse, AdJson } from '@/types';
 
 interface AdGeneratorStepProps {
   session: SessionValidateResponse;
+  businessName: string;
+  businessDescription: string;
   onComplete: () => void;
 }
 
@@ -17,15 +19,12 @@ interface AdVersion {
 }
 
 interface AdInputs {
-  businessName: string;
-  description: string;
   services: string;
   targetCustomer: string;
-  tradePreferences: string;
   location: string;
 }
 
-export function AdGeneratorStep({ session, onComplete }: AdGeneratorStepProps) {
+export function AdGeneratorStep({ session, businessName, businessDescription, onComplete }: AdGeneratorStepProps) {
   const { success, error: showError } = useToast();
   const [step, setStep] = useState<'inputs' | 'results'>('inputs');
   const [generating, setGenerating] = useState(false);
@@ -36,11 +35,8 @@ export function AdGeneratorStep({ session, onComplete }: AdGeneratorStepProps) {
   const [editedAds, setEditedAds] = useState<Record<string, Partial<AdJson>>>({});
 
   const [inputs, setInputs] = useState<AdInputs>({
-    businessName: '',
-    description: '',
     services: '',
     targetCustomer: '',
-    tradePreferences: '',
     location: '',
   });
 
@@ -51,11 +47,6 @@ export function AdGeneratorStep({ session, onComplete }: AdGeneratorStepProps) {
   const getToken = () => window.location.pathname.split('/').pop() || '';
 
   const generateAd = async () => {
-    if (!inputs.businessName.trim() || !inputs.description.trim()) {
-      showError('Required fields missing', 'Please fill in business name and description.');
-      return;
-    }
-
     setGenerating(true);
     try {
       const res = await fetch('/api/ad/generate', {
@@ -64,11 +55,11 @@ export function AdGeneratorStep({ session, onComplete }: AdGeneratorStepProps) {
         body: JSON.stringify({
           token: getToken(),
           inputs: {
-            businessName: inputs.businessName,
-            description: inputs.description,
+            businessName,
+            description: businessDescription,
             services: inputs.services.split(',').map(s => s.trim()).filter(Boolean),
             targetCustomer: inputs.targetCustomer,
-            tradePreferences: inputs.tradePreferences,
+            tradePreferences: '',
             location: inputs.location,
           },
         }),
@@ -134,28 +125,11 @@ export function AdGeneratorStep({ session, onComplete }: AdGeneratorStepProps) {
       <div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <h2 className="text-2xl font-bold text-itex-dark mb-1">Generate Your ITEX Ad</h2>
-          <p className="text-itex-gray">Tell us about your business and our AI will craft a compelling directory ad.</p>
+          <p className="text-itex-gray">Our AI will craft a compelling directory ad for <span className="font-semibold text-itex-dark">{businessName}</span>.</p>
         </motion.div>
 
         <GlassCard>
           <div className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-itex-dark mb-1.5">
-                Business Name <span className="text-red-400">*</span>
-              </label>
-              <input type="text" value={inputs.businessName} onChange={updateInput('businessName')}
-                placeholder="Acme Corporation" className={inputClass} />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-itex-dark mb-1.5">
-                Business Description <span className="text-red-400">*</span>
-              </label>
-              <textarea value={inputs.description} onChange={updateInput('description')}
-                placeholder="What does your business do? What makes you unique?"
-                rows={3} className={`${inputClass} resize-none`} />
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-itex-dark mb-1.5">
                 Services / Products
@@ -177,18 +151,10 @@ export function AdGeneratorStep({ session, onComplete }: AdGeneratorStepProps) {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-itex-dark mb-1.5">Trade Preferences</label>
-              <input type="text" value={inputs.tradePreferences} onChange={updateInput('tradePreferences')}
-                placeholder="What would you like to receive in trade? (e.g., printing, catering, legal services)"
-                className={inputClass} />
-            </div>
-
             <GradientButton
               fullWidth size="lg"
               onClick={generateAd}
               loading={generating}
-              disabled={!inputs.businessName.trim() || !inputs.description.trim()}
             >
               <Sparkles className="w-5 h-5" />
               Generate My Ad with AI

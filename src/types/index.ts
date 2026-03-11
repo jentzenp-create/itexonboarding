@@ -164,6 +164,39 @@ export interface VoiceChatResponse {
   reply: string;
 }
 
+// Discovery Chat Types
+
+export interface DiscoverMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface DiscoverRequest {
+  token: string;
+  businessName: string;
+  location: string;
+  messages: DiscoverMessage[];
+}
+
+export interface DiscoverResponse {
+  reply: string;
+  isReady: boolean;
+}
+
+export interface GenerateFromChatRequest {
+  token: string;
+  businessName: string;
+  location: string;
+  conversationHistory: DiscoverMessage[];
+}
+
+export interface GenerateFromChatResponse {
+  adVersionId: string;
+  businessDescription: string;
+  offerSummary: string;
+  ad: AdJson;
+}
+
 // Component Props Types
 
 export interface Step {
